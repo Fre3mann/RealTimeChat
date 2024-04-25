@@ -1,0 +1,163 @@
+const nameContainer = document.getElementById('name-container');
+const nameInput = document.getElementById('name-input');
+const enterButton = document.getElementById('enter-button');
+const chatContainer = document.getElementById('chat-container');
+const messageContainer = document.getElementById('message-container');
+const messageInput = document.getElementById('message-input');
+const sendButton = document.getElementById('send-button');
+const activeUsersList = document.getElementById('active-users-list');
+
+let socket; // Define the socket variable
+
+// Hide the chat container initially
+chatContainer.style.display = 'none';
+
+// Function to show chat and hide name input
+function showChat() {
+    chatContainer.style.display = 'block';
+    nameContainer.style.display = 'none';
+}
+
+// Function to handle WebSocket events
+function handleWebSocketEvents(socket) {
+    // Handle incoming messages
+    socket.addEventListener('message', function(event) {
+        const message = event.data;
+        if (message.startsWith('#users:')) {
+            const users = JSON.parse(message.substring(7));
+            updateActiveUsersList(users);
+        } else {
+            // Handle other types of messages if needed
+        }
+    });
+}
+
+// Function to initialize WebSocket connection
+function initWebSocket(name) {
+    socket = new WebSocket('ws://localhost:3000');
+
+    // Handle incoming messages
+    socket.addEventListener('message', function (event) {
+        const message = event.data;
+        appendMessage(message);
+    });
+
+    // Function to append a new message to the message container
+    function appendMessage(message) {
+        const messageElement = document.createElement('p');
+        
+        // Check if the message is a Blob
+        if (message instanceof Blob) {
+            // Read the Blob as text
+            const reader = new FileReader();
+            reader.onload = function() {
+                messageElement.innerText = reader.result;
+                messageContainer.appendChild(messageElement);
+                messageContainer.scrollTop = messageContainer.scrollHeight;
+            };
+            reader.readAsText(message);
+        } else {
+            // If it's not a Blob, assume it's a string
+            messageElement.innerText = message;
+            messageContainer.appendChild(messageElement);
+            messageContainer.scrollTop = messageContainer.scrollHeight;
+        }
+    }
+
+    // Function to send message
+    function sendMessage() {
+        const message = messageInput.value;
+        if (message.trim() !== '') {
+            // Check if the WebSocket connection is open
+            if (socket.readyState === WebSocket.OPEN) {
+                // Send the message
+                socket.send(name + ': ' + message);
+                messageInput.value = '';
+                appendMessage("You: " + message);
+            } else {
+                console.error('WebSocket connection is not open.');
+                // You can handle this scenario appropriately, such as displaying an error message to the user
+            }
+        }
+    }
+
+    // Send message when the send button is clicked or "Enter" is pressed
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+// WebSocket event listener for receiving active users list
+socket.addEventListener('message', function (event) {
+    console.log('Received active users:', event.data); // Log the received data
+    const users = JSON.parse(event.data);
+    updateActiveUsersList(users);
+});
+
+    // WebSocket event listener for user disconnection
+    socket.addEventListener('disconnect', function (event) {
+        const username = event.data;
+        handleUserDisconnect(username);
+    });
+}
+
+// Function to join the chat
+function joinChat() {
+    const name = nameInput.value.trim();
+    if (name !== '') {
+        showChat();
+        initWebSocket(name);
+        // Send the username to the server
+        socket.send('#username:' + name);
+    } else {
+        alert('Please enter your name.');
+    }
+}
+
+// Add event listener for "Enter" key on name input
+nameInput.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+        joinChat();
+    }
+});
+
+// Add event listener to the enter button
+enterButton.addEventListener('click', function() {
+    const name = nameInput.value.trim();
+    if (name !== '') {
+        // Show the chat container and hide the name container
+        chatContainer.style.display = 'block';
+        nameContainer.style.display = 'none';
+
+        // Initialize WebSocket connection
+        initWebSocket(name);
+    } else {
+        alert('Please enter your name.');
+    }
+});
+
+// Function to update active users list
+function updateActiveUsersList(users) {
+    console.log(users); // Log the received users to the console
+    // Clear existing user list
+    activeUsersList.innerHTML = '';
+    // Add each user to the list
+    users.forEach(user => {
+        const userItem = document.createElement('li');
+        userItem.textContent = user;
+        activeUsersList.appendChild(userItem);
+    });
+}
+
+// Function to handle user disconnections
+function handleUserDisconnect(username) {
+    // Find and remove the disconnected user from the list
+    const userItems = activeUsersList.querySelectorAll('li');
+    userItems.forEach(userItem => {
+        if (userItem.textContent === username) {
+            userItem.remove();
+        }
+    });
+}

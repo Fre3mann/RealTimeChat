@@ -23,12 +23,15 @@ function broadcastActiveUsers() {
 wss.on('connection', function connection(ws) {
     console.log('A new client connected');
 
-       // Add new client to active users list
-       ws.on('message', function incoming(message) {
-        console.log('Received: %s', message);
-        // If the received message starts with '#username', extract the username
-        if (message.startsWith('#username:')) {
-            const username = message.replace('#username:', '').trim();
+    // Add new client to active users list
+    ws.on('message', function incoming(message) {
+        console.log('Received:', message);
+        // Convert the message to a string
+        const messageString = message.toString();
+
+        // If the received message starts with '#username:', extract the username
+        if (messageString.startsWith('#username:')) {
+            const username = messageString.substring(10).trim(); // Remove '#username:' prefix
             ws.username = username;
             if (!activeUsers.includes(username)) {
                 activeUsers.push(username);
